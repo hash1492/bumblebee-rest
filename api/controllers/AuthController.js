@@ -61,41 +61,63 @@ module.exports = {
   register: function (req, res) {
     var user = req.body;
 
-    user.doc_type = "user";
-    delete user.confirm_password;
-    user.db_name = "db_" + uuid.v4();
+    // Check if user already exists
+    request({
+		    url: 'https://erinstioursbasseartooret:887abf020b060d6569fe72392a14e9ac6c761537@hash1492.cloudant.com/bumblebee/_design/users/_view/users_by_email?keys=["'+ user.email +'"]&limit=1',
+		    method: 'GET',
+		}, function(error, response, body){
 
-    // Hash the master password
-    bcrypt.hash(user.password, 10, function(err, hash) {
-      console.log(hash);
-      user.password = hash;
-      // Create the user's doc in the master database
-      request({
-  		    url: 'https://erinstioursbasseartooret:887abf020b060d6569fe72392a14e9ac6c761537@hash1492.cloudant.com/bumblebee?include_docs=true',
-  		    method: 'POST',
-  		    json: user
-  		}, function(error, response, created_user){
-  		    if(error) {
-  		        console.log(error);
-  		    } else {
-  		        console.log(created_user);
-              // Create the user's database
-              request({
-          		    url: 'https://hash1492:bumblebeepass@hash1492.cloudant.com/' + user.db_name,
-          		    method: 'PUT'
-          		}, function(error, response, user_db){
-          		    if(error) {
-          		        console.log(error);
-          		    } else {
-          		        console.log(user_db);
-                      created_user.db_name = user.db_name;
+		    if(error) {
+		        console.log(error);
+		    } else {
+            console.log(body);
+            body = JSON.parse(body);
+            // User with this email already exists
+            if(body.rows.length > 0){
+              res.send({code: "USER_EXISTS"});
+              return;
+            }
+            // User with the email doesn't exist
+            else if(body.rows.length === 0){
 
-          						res.ok(created_user);
-          				}
-          		});
-  				}
-  		});
-    });
+              user.doc_type = "user";
+              delete user.confirm_password;
+              user.db_name = "db_" + uuid.v4();
+
+              // Hash the master password
+              bcrypt.hash(user.password, 10, function(err, hash) {
+                console.log(hash);
+                user.password = hash;
+                // Create the user's doc in the master database
+                request({
+            		    url: 'https://erinstioursbasseartooret:887abf020b060d6569fe72392a14e9ac6c761537@hash1492.cloudant.com/bumblebee?include_docs=true',
+            		    method: 'POST',
+            		    json: user
+            		}, function(error, response, created_user){
+            		    if(error) {
+            		        console.log(error);
+            		    } else {
+            		        console.log(created_user);
+                        // Create the user's database
+                        request({
+                    		    url: 'https://hash1492:bumblebeepass@hash1492.cloudant.com/' + user.db_name,
+                    		    method: 'PUT'
+                    		}, function(error, response, user_db){
+                    		    if(error) {
+                    		        console.log(error);
+                    		    } else {
+                    		        console.log(user_db);
+                                created_user.db_name = user.db_name;
+
+                    						res.ok({code: "USER_REGISTERED", data: created_user});
+                    				}
+                    		});
+            				}
+            		});
+              });
+            }
+				}
+		});
 
 
 
